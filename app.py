@@ -22,14 +22,25 @@ def load_words(file_path):
                 if isinstance(item, dict):
                     word = item.get("word", "")
                     meaning = item.get("meaning", "")
+                    phonetic = item.get("phonetic", "") 
+                    example = item.get("example", "")
+                    phrase = item.get("phrase", "")
+
                     if not meaning and "translations" in item and len(item["translations"]) > 0:
                         meaning = item["translations"][0].get("translation", "")
                 else:
                     word = str(item)
                     meaning = "请查阅词典"
+                    phonetic, example, phrase = "", "", ""
                 
                 if word:
-                    processed_data.append({"word": word, "meaning": meaning})
+                    processed_data.append({
+                        "word": word, 
+                        "meaning": meaning,
+                        "phonetic": phonetic,
+                        "example": example,
+                        "phrase": phrase
+                    })
             return processed_data
     except Exception as e:
         st.error(f"读取词库出错: {e}")
@@ -48,53 +59,61 @@ if menu == "背单词":
     if not word_list:
         st.error("词库为空！请检查文件是否存在或格式是否正确。")
     else:
-        # 显示词库总数
         st.success(f"🎉 当前词库已成功加载，共计 **{len(word_list)}** 个单词！")
         
-        # 初始化状态：如果切换了词库，重置索引和显示状态
         if 'current_type' not in st.session_state or st.session_state.current_type != word_type:
             st.session_state.current_type = word_type
             st.session_state.current_index = 0  
             st.session_state.show_meaning = False 
         
-        # 获取当前单词数据
+        st.checkbox("自动显示释义 (记住你的选择)", key="auto_show_meaning", value=False)
+
         current_word_data = word_list[st.session_state.current_index]
         
-        # 显示当前进度
         st.info(f"### 当前单词 (进度: {st.session_state.current_index + 1} / {len(word_list)})：")
         
-        # 巨大的单词展示
-        st.markdown(f"<h1 style='text-align: center; color: #1f77b4; margin-bottom: 30px;'>{current_word_data['word']}</h1>", unsafe_allow_html=True)
+        st.markdown(f"<h1 style='text-align: center; color: #1f77b4; margin-bottom: 10px;'>{current_word_data['word']}</h1>", unsafe_allow_html=True)
         
-        # 按钮区域布局（平分三列）
+        col_ph, col_audio = st.columns([1, 1])
+        with col_ph:
+            if current_word_data.get('phonetic'):
+                st.markdown(f"<h4 style='text-align: center; color: gray;'>[{current_word_data['phonetic']}]</h4>", unsafe_allow_html=True)
+            else:
+                st.markdown("<h4 style='text-align: center; color: gray;'>暂无音标</h4>", unsafe_allow_html=True)
+                
+        with col_audio:
+            tts_url = f"https://dict.youdao.com/dictvoice?audio={current_word_data['word']}&type=2"
+            st.audio(tts_url, format="audio/mp3")
+        
         col1, col2, col3 = st.columns([1, 1, 1])
         
         with col1:
             if st.button("⬅️ 上一个", use_container_width=True):
                 if st.session_state.current_index > 0:
                     st.session_state.current_index -= 1
-                    st.session_state.show_meaning = False # 切换时隐藏释义
                 else:
                     st.toast("已经是第一个单词啦！")
                     
         with col2:
-            if st.button("👁️ 显示/隐藏释义", use_container_width=True):
+            if st.button("👁️ 手动显示/隐藏", use_container_width=True):
                 st.session_state.show_meaning = not st.session_state.show_meaning
                 
         with col3:
             if st.button("下一个 ➡️", use_container_width=True):
                 if st.session_state.current_index < len(word_list) - 1:
                     st.session_state.current_index += 1
-                    st.session_state.show_meaning = False # 切换时隐藏释义
                 else:
                     st.toast("已经是最后一个单词啦！🎉")
         
-        # 显示释义区域
-        st.markdown("<br>", unsafe_allow_html=True) # 加点空隙
-        if st.session_state.show_meaning:
-            st.success(f"**{current_word_data['meaning']}**")
-        else:
-            st.info("释义已隐藏，点击上方按钮查看。")
+        st.markdown("<br>", unsafe_allow_html=True) 
+        
+        if st.session_state.get("auto_show_meaning", False) or st.session_state.show_meaning:
+            st.success(f"**词义：** {current_word_data['meaning']}")
+            
+            if current_word_data.get('phrase'):
+                st.info(f"**短语：** {current_word_data['phrase']}")
+            if current_word_data.get('example'):
+                st.warning(f"**例句：** {current_word_data['example']}")
 
 # ----------------- 功能 2：作文模板与 AI 批改 -----------------
 elif menu == "作文模板与批改":
